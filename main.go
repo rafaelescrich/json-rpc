@@ -3,11 +3,12 @@ package main
 import (
 	"fmt"
 	"log"
-	"net"
 	"net/rpc"
 	"net/rpc/jsonrpc"
+	"time"
 
 	"github.com/rafaelescrich/json-rpc/services"
+	kcp "github.com/xtaci/kcp-go"
 )
 
 func startServer() {
@@ -18,7 +19,9 @@ func startServer() {
 
 	server.HandleHTTP(rpc.DefaultRPCPath, rpc.DefaultDebugPath)
 
-	l, e := net.Listen("tcp", ":8222")
+	// l, e := net.Listen("tcp", ":8080")
+	l, e := kcp.Listen(":8080")
+
 	if e != nil {
 		log.Fatal("listen error:", e)
 	}
@@ -35,25 +38,41 @@ func startServer() {
 
 func main() {
 	go startServer()
+	start := time.Now()
 
-	conn, err := net.Dial("tcp", "localhost:8080")
-
-	if err != nil {
-		panic(err)
+	type results struct {
+		args  *services.Args
+		reply uint64
 	}
-	defer conn.Close()
 
-	args := &services.Args{A: 7, B: 8}
-	var reply int
+	for i := 0; i < 4096; i++ {
 
-	c := jsonrpc.NewClient(conn)
+		ss := make(chan results)
 
-	for i := 0; i < 1; i++ {
+		go func(i int) {
+			// conn, err := net.Dial("tcp", "localhost:8080")
+			conn, err := kcp.Dial("localhost:8080")
+			defer conn.Close()
 
-		err = c.Call("Arith.Multiply", args, &reply)
-		if err != nil {
-			log.Fatal("arith error:", err)
-		}
-		fmt.Printf("Arith: %d*%d=%d\n", args.A, args.B, reply)
+			if err != nil {
+				panic(err)
+			}
+			c := jsonrpc.NewClient(conn)
+
+			args := &services.Args{A: 7 * uint64(i), B: 8 * uint64(i)}
+			var reply uint64
+			err = c.Call("Arith.Multiply", args, &reply)
+			if err != nil {
+				log.Fatal("arith error:", err)
+			}
+			ss <- results{args, reply}
+		}(i)
+
+		rr := <-ss
+		fmt.Printf("Arith: %d*%d=%d\n", rr.args.A, rr.args.B, rr.reply)
 	}
+
+	t := time.Now()
+	elapsed := t.Sub(start)
+	fmt.Printf("Time elapsed: %s\n", elapsed.String())
 }

@@ -4,19 +4,19 @@ import "errors"
 
 // Args is a struct to
 type Args struct {
-	A, B int
+	A, B uint64
 }
 
 // Quotient struct
 type Quotient struct {
-	Quo, Rem int
+	Quo, Rem uint64
 }
 
-// Arith int type
-type Arith int
+// Arith int64 type
+type Arith uint64
 
 // Multiply two numbers
-func (t *Arith) Multiply(args *Args, reply *int) error {
+func (t *Arith) Multiply(args *Args, reply *uint64) error {
 	*reply = args.A * args.B
 	return nil
 }
